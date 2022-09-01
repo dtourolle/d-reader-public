@@ -1,0 +1,12 @@
+[Service]
+WorkingDirectory=/home/pi/ereader/ereader
+ExecStart=python3 /home/pi/ereader/ereader/main.py
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=ereader
+User=pi
+
+
+[Install]
+WantedBy=multi-user.target

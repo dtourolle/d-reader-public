@@ -1,0 +1,7 @@
+gattlib
+textwrap2
+IT8951 @ git+https://github.com/GregDMeyer/IT8951
+bluepy
+RPi.GPIO
+ebooklib
+pyhyphen==3.0.1 # newer versions result in a "Illegal instruction" on the RPI
