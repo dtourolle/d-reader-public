@@ -6,18 +6,18 @@ This was/is a project to create a functioning E-reader for my partner, which wou
 
 I have tried to document the development process, source code and CAD/CAM. If you are interested these are split between the pages.
 
-[Requirement Analysis](https://dtourolle.github.io/requirement-analysis.html)
-[Mechanical Design and CAM](https://dtourolle.github.io/mechanical.html)
-[Electronics design](https://dtourolle.github.io/electronics.html)
-[Software design](https://dtourolle.github.io/software.html)
-[Lessons learnt](https://dtourolle.github.io/lessons.html)
+- [Requirement Analysis](https://dtourolle.github.io/requirement-analysis.html)
+- [Mechanical Design and CAM](https://dtourolle.github.io/mechanical.html)
+- [Electronics design](https://dtourolle.github.io/electronics.html)
+- [Software design](https://dtourolle.github.io/software.html)
+- [Lessons learnt](https://dtourolle.github.io/lessons.html)
 
 # Acknowledgements
 
 The project would have been impossible for me to complete without the OpenSource code created in the following projects:
 
-[IT8951 Display driver](https://github.com/GregDMeyer/IT8951)
-[Various bits of HTML parsing, inspiration for decoding EPUB](https://github.com/wustho/epr)
-[Micropython for the trigger device](https://micropython.org/)
-[Inspiration for powering the device one and off](https://github.com/NeonHorizon/lipopi)
-[ulab for fast maths on embedded devices](https://github.com/v923z/micropython-ulab)
+- [IT8951 Display driver](https://github.com/GregDMeyer/IT8951)
+- [Various bits of HTML parsing, inspiration for decoding EPUB](https://github.com/wustho/epr)
+- [Micropython for the trigger device](https://micropython.org/)
+- [Inspiration for powering the device one and off](https://github.com/NeonHorizon/lipopi)
+- [ulab for fast maths on embedded devices](https://github.com/v923z/micropython-ulab)
