@@ -14,10 +14,16 @@ from time import sleep
 import threading
 import epub as epb
 
+from typing import List, Dict, Any, Optional
 
 class master_program:
 
-    def __init__(self,submodules):
+    def __init__(self,submodules:List[Any]):
+        """The main application for the e-reader. 
+
+        Args:
+            submodules (List): Not yet used concept of allowing new application to run on the system.
+        """        
         self.submodules = submodules
         self.display = AutoEPDDisplay(vcom=-2.06, rotate="CW", spi_hz=24000000)
         self.ebook_list = []
@@ -30,15 +36,24 @@ class master_program:
         self.load_settings()
 
 
-    def save_settings(self,names=None):
+    def save_settings(self,names:Optional[List[str]]=None):
+        """Save settings to disk, this is the current state of the e-reader.
 
+        Args:
+            names (List[str], optional): The name of the specific settings to be stored. Defaults to None.
+        """        
         if names is None:
             keys = list(self.settings.keys())
         with shelve.open(self.settings_file) as db:
             for key in keys:
                 db[key]=self.settings[key]
 
-    def load_settings(self,names=None):
+    def load_settings(self,names:Optional[List[str]]=None):
+        """Load settings/state from disk. If only some elements are wanted the specify as a list.
+
+        Args:
+            names (Optional[List[str]], optional): The desired settings. Defaults to None.
+        """        
         if names is None:
             keys = list(self.settings.keys())
         with shelve.open(self.settings_file) as db:
@@ -46,6 +61,8 @@ class master_program:
                 self.settings[key]=db.get(key,self.settings[key])
 
     def launch(self):
+        """Start the e-reader application.
+        """        
         with shelve.open(self.settings_file) as db:
             try:
                 self.settings['state'] = db['state']
@@ -55,6 +72,8 @@ class master_program:
         self.state_manager()
 
     def refersh_ebook_list(self):
+        """Search the library for any new e-books to be loaded.
+        """        
         self.ebook_list = []
         files = glob("/home/pi/ebooks/*.epub") + glob("/home/pi/ebooks/*.EPUB") + glob("/home/pi/ebooks/*.txt")
         files.sort(key=os.path.getmtime)
@@ -88,11 +107,20 @@ class master_program:
                 entry={'path':f,'title':title,'creator':creator}
                 self.ebook_list.append(entry)
 
-    def book_menu(self):
+    def book_menu(self)->str:
+        """This is the library menu mode. It manages the display based upon the buttons pressed.
+        When the application closes it returns an action string telling the main program what the
+        user expects. THis can either be launching the reader app or shutting down.
+
+        Returns:
+            str: follow up action for main application.
+        """        
         self.refersh_ebook_list()
         self.settings['state']='book_menu'
         titles = [entry['title']+': von '+ entry['creator'] for entry in self.ebook_list]
         def update_display():
+            """internal function for rendering the screen of the library list.
+            """            
             screen = display_list(titles,self.settings)
             self.display.frame_buf.paste(screen, (0,0))
             self.display.draw_full(constants.DisplayModes.GC16)
@@ -133,6 +161,8 @@ class master_program:
             sleep(0.1)
 
     def quit(self):
+        """Shut down sequence to ensure state is correctly save and disk is protected.
+        """        
         self.save_settings()
         self.input_handler.stop()
         screen = Image.open('/home/pi/ebooks/background.jpg').convert('LA').rotate(90, expand=True)
@@ -144,6 +174,8 @@ class master_program:
         exit()
 
     def state_manager(self):
+        """Manage the changes in state of the e-reader (ie.e switch applications)
+        """        
         while True:
             print(self.settings['state'])
             test_state = getattr(self, self.settings['state'])()
@@ -154,7 +186,13 @@ class master_program:
 
             sleep(0.01)
 
-    def reader_app(self):
+    def reader_app(self)->str:
+        """This is the e-reader application. It control's the display and based upon thr user inputs renders an
+        e-book page by page.
+
+        Returns:
+            str: On exit it returns the users desired next state, this can be shutdown or library mode.
+        """        
         canvas = Image.new('L',self.settings['canvas_shape'], color=0)
         draw = ImageDraw.Draw(canvas)
         font_normal = ImageFont.truetype("/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf", self.settings['font_size'],layout_engine=ImageFont.LAYOUT_RAQM)
@@ -253,8 +291,16 @@ class master_program:
 
 
 
-def display_list(item_list, settings):
+def display_list(item_list:List[str], settings:Dict[str,Any])->Image:
+    """Render a list as a image for the e-reader
 
+    Args:
+        item_list (_type_): The list of strings to be rendered.
+        settings (_type_): The settings for rendering.
+
+    Returns:
+        _type_: _description_
+    """
     active_element = settings.get('active',None)
     if active_element is not None and active_element >= len(item_list):
         if len(item_list)==0:

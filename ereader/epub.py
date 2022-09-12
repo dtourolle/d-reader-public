@@ -14,7 +14,7 @@ from textwrap2 import wrap
 import textwrap
 from collections import OrderedDict
 import threading
-
+from typing import Dict, Any, List
 
 settings = {'canvas_shape':(1072, 1448),'font_size':42,'background':255,'margin':80,'line_spacing':60,'list_spacing':0,'text_width':100}
 
@@ -147,6 +147,13 @@ class HTMLtoLines(HTMLParser):
 
 class FixSizeOrderedDict(OrderedDict):
     def __init__(self, *args, max=0, **kwargs):
+        """This is a dict with a fixed size and order. It is used as a 
+        "circular buffer" for the pages which are pre-rendered. The key 
+        is the current page number.
+
+        Args:
+            max (int, optional): The total size of the buffer, if zero there is no limit. Defaults to 0.
+        """        
         self._max = max
         super().__init__(*args, **kwargs)
 
@@ -159,6 +166,12 @@ class FixSizeOrderedDict(OrderedDict):
 class ebook:
     
     def __init__(self,file:str,buffer:int=7):
+        """Create an ebook object, will load it from the epub file.
+
+        Args:
+            file (str): path to the file.
+            buffer (int, optional): Number of pre-rerendered pages. Defaults to 7.
+        """        
         self.input_zip = file
         input_zip=ZipFile(self.input_zip)
         self.components = {name: input_zip.read(name) for name in input_zip.namelist()}
@@ -181,6 +194,14 @@ class ebook:
         self.render_thread = None
 
     def clean_language(self)->str:
+        """Some epubs have a language in the meta-data, some do not, there seems to also
+        be no standard in how languages are abbreviated. Since this will likely only be used
+        for English, French and German ebooks, catch the most common cases and if not assume
+        english. This is only really needed for hyphenation.
+
+        Returns:
+            str: a valid language string.
+        """        
         print("checking language for hyphenation",self.language)
         self.language = self.language.strip()
         if self.language in dictools.LANGUAGES:
@@ -194,16 +215,30 @@ class ebook:
         return 'en_US'
 
     def gen_buffer(self):
+        """generate the buffer of pre-rendered pages for fist time.
+        """        
         for i in range(self.buffer):
             print("Buffer_stuff",i)
             self.render_pages(settings)
             
             
-    def current_page(self):
-        
+    def current_page(self)->Image:
+        """get the current page buffer.
+
+        Returns:
+            Image: The current page from the buffer.
+        """        
         return self.page_buffer[self.view_page]
         
-    def next_page(self):
+    def next_page(self)->Image:
+        """Increment the page buffer and return the current page if possible. If
+        not possible it will spawn new threads to render the page and return a page
+        on completion. Some checks are made to ensure new threads are only spawned
+        when no rendering threads exists.
+
+        Returns:
+            Image: the current page after the increment.
+        """        
         if self.location_info['page']-self.view_page <7:
             print("rendering pages at middle of buffer:",self.location_info['page']-self.view_page)
             if self.render_thread is None:
@@ -228,14 +263,26 @@ class ebook:
             else:
                 
                 return self.page_buffer[list(self.page_buffer)[-1]]
-    def render_page_threaded(self,settings):
+
+
+    def render_page_threaded(self,settings:Dict[str, Any]):
+        """Render method for the threads. Allowing settings with different page numbers.
+
+        Args:
+            settings (Dict[str, Any]): Settings for the renderer.
+        """        
         self.render_pages(settings)
         self.render_thread=None
 
 
 
 
-    def previous_page(self):
+    def previous_page(self)->Image:
+        """Return the previous page and increment the buffer backwards.
+
+        Returns:
+            Image: The previous page.
+        """        
         self.view_page-=1
         print(self.view_page)
         if self.view_page <0:
@@ -255,14 +302,24 @@ class ebook:
             
             return self.page_buffer[self.view_page]
 
-    def render_n_pages(self,settings,n):
+    def render_n_pages(self,settings:Dict[str, Any],n:int):
+        """Render an arbitrary number of pages ahead and store them in the buffer.
+
+        Args:
+            settings (Dict[str, Any]): The layout settings for the pages.
+            n (int): number of pages to be rendered.
+        """        
         for i in range(n):
             self.render_pages(settings)
         self.render_thread=None
 
     
-    def extract_metadata(self):
+    def extract_metadata(self)->Dict[str, str]:
+        """Extract metadata about EPUB from the file.
 
+        Returns:
+            Dict[str, str]: The metadata in a dictionary.
+        """
         opf = [i for i in self.components if '.opf' in i][0]
         contents_decoded=xmltodict.parse(self.components[opf].decode("utf-8"))
         metadata = contents_decoded['package']['metadata']
@@ -283,9 +340,8 @@ class ebook:
             dates = {'published':date_info}
         else:
             dates = {x['@opf:event']:x['#text'] for x in date_info}
-        language = metadata.get('dc:language',{})#.get('language')
+        language = metadata.get('dc:language',{})
 
-        print(language)
         meta = metadata.get('meta')
         cover = None
         if type(meta) is list:
@@ -293,17 +349,23 @@ class ebook:
                 c = m.get('cover')
         else:
             cover = meta.get('@content')
-        #.get('@content')
+
         return {'author':author,'title':title,'dates':dates,'cover':cover,'language':language}
     
     def get_current_doc(self):
+        """Load the current sub document of the EPUB into a buffer dor processing into pages.
+        """        
         parser = HTMLtoLines()
         content = self.components[self.organisation[self.location_info['doc']]].decode("utf-8")
         parser.feed(content)
         self.current_doc=parser.get_lines()
         
-    def get_organisation(self):
+    def get_organisation(self)->Dict[str,str]:
+        """Using the opf determine the structure of the ebook.
 
+        Returns:
+            Dict[str,str]: The structure (a dict of all sub-documents with keys which can determine the order in the book)
+        """
         opf = [i for i in self.components if '.opf' in i][0]
         opf_location = '/'.join(opf.split('/')[:-1])
         
@@ -320,7 +382,14 @@ class ebook:
         return(organisation)
     
     
-    def render_pages(self,settings):
+    def render_pages(self,settings:Dict[str,Any]):
+        """Using the stored data of the EPUB and the rendering settings generate an page of the book as an image.
+        Store the page in the buffer, and store the line and sub-document in a look up for fast reverse scrolling.
+
+
+        Args:
+            settings (Dict[str,Any]): The settings for the renderer.
+        """        
         canvas = Image.new('L',settings['canvas_shape'], color=0)
 
         font = ImageFont.truetype(self.font , settings['font_size'],layout_engine=ImageFont.LAYOUT_RAQM)
@@ -391,6 +460,13 @@ class ebook:
                 
     
     def prepare_current_doc(self,line_width=42):
+        """This function splits up the sub document into lines which should
+        fit on the page. If a line would go over the page a hyphenator is used
+        to split the word at the end according to language based rules.
+
+        Args:
+            line_width (int, optional): The expected number of characters per line. Defaults to 42.
+        """        
         self.chapter_lines=[]
         for segment in self.current_doc[0]:
             if '[IMG:' in segment:#does this segment contain an image
@@ -406,7 +482,19 @@ class ebook:
                     lines = textwrap.wrap(segment,width=line_width)
                 self.chapter_lines += lines
     
-    def load_image(self,image_key):
+    def load_image(self,image_key:str)->Image:
+        """Based upon the image key in a sub-document load the image to be displayed.
+        As E-ink is grayscale, and on top of the resolution of the images vs the screen
+        is going to be really random as no one seems to store real DPIs, rescale the 
+        image to fit on the screen and perform contrast enhancement to make it clearer
+        in greyscale.
+
+        Args:
+            image_key (str): The image id in the sub-document.
+
+        Returns:
+            Image: The image made pretty for the E-ink
+        """        
         doc_location = self.organisation[self.location_info['doc']].split('/')[:-1]
         
         image_location = '/'.join(doc_location+[self.current_doc[1].get(image_key)])
